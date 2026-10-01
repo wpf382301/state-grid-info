@@ -12,7 +12,7 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import (
     DOMAIN, NAME,
-    DATA_SOURCE_HASSBOX, DATA_SOURCE_QINGLONG, DATA_SOURCE_OPTIONS, DATA_SOURCE_NAMES,
+    DATA_SOURCE_HASSBOX, DATA_SOURCE_QINGLONG, DATA_SOURCE_APP, DATA_SOURCE_OPTIONS, DATA_SOURCE_NAMES,
     BILLING_STANDARD_OPTIONS, BILLING_STANDARD_NAMES,
     BILLING_STANDARD_YEAR_阶梯, BILLING_STANDARD_YEAR_阶梯_峰平谷,
     BILLING_STANDARD_MONTH_阶梯, BILLING_STANDARD_MONTH_阶梯_峰平谷,
@@ -29,8 +29,23 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+from .app_source import app_households
 
-class StateGridInfoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class AppConsumerSelection:
+    async def async_step_app_consumer(self, user_input=None):
+        households = app_households(self.hass)
+        errors = {} if households else {'base':'app_source_not_found'}
+        if user_input is not None and user_input.get(CONF_CONSUMER_NUMBER) in households:
+            household = user_input[CONF_CONSUMER_NUMBER]
+            self._data[CONF_CONSUMER_NUMBER] = household
+            self._data[CONF_CONSUMER_NAME] = households[household] or ''
+            return await self.async_step_billing_standard()
+        return self.async_show_form(step_id='app_consumer', data_schema=vol.Schema({
+            vol.Required(CONF_CONSUMER_NUMBER, default=self._data.get(CONF_CONSUMER_NUMBER,'')):vol.In(households),
+        }), errors=errors)
+
+
+class StateGridInfoConfigFlow(AppConsumerSelection, config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for State Grid Info."""
 
     VERSION = 1
@@ -70,6 +85,8 @@ class StateGridInfoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             if user_input[CONF_DATA_SOURCE] == DATA_SOURCE_HASSBOX:
                 return await self.async_step_hassbox_consumer()
+            elif user_input[CONF_DATA_SOURCE] == DATA_SOURCE_APP:
+                return await self.async_step_app_consumer()
             else:
                 return await self.async_step_qinglong_mqtt()
         
@@ -392,13 +409,13 @@ class StateGridInfoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
         return schema
 
-class StateGridInfoOptionsFlowHandler(config_entries.OptionsFlow):
+class StateGridInfoOptionsFlowHandler(AppConsumerSelection, config_entries.OptionsFlow):
     """Handle options flow for State Grid Info."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry):
         """Initialize options flow."""
         self._config_entry = config_entry
-        self._data = dict(config_entry.data)
+        self._data = {**config_entry.data, **config_entry.options}
         self._consumer_numbers = []
 
     def _read_config_file(self, config_path):
@@ -426,6 +443,8 @@ class StateGridInfoOptionsFlowHandler(config_entries.OptionsFlow):
             
             if user_input[CONF_DATA_SOURCE] == DATA_SOURCE_HASSBOX:
                 return await self.async_step_hassbox_consumer()
+            elif user_input[CONF_DATA_SOURCE] == DATA_SOURCE_APP:
+                return await self.async_step_app_consumer()
             else:
                 return await self.async_step_qinglong_mqtt()
         

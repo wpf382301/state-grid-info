@@ -107,12 +107,20 @@
           "month_12_ladder_3_valley": "12月第三阶梯谷时段电价（元/度）",
           "is_prepaid": "是否预付费"
         }
+      },
+      "app_consumer": {
+        "title": "选择国网 App 户号",
+        "description": "请先安装并登录 stevenjoezhang/hass-state-grid，再选择要保存历史的户号。",
+        "data": {
+          "consumer_number": "电力户号"
+        }
       }
     },
     "error": {
       "hassbox_config_not_found": "未找到HassBox配置文件，请确保已安装并配置HassBox集成",
       "hassbox_config_error": "读取HassBox配置文件出错，请检查文件格式是否正确",
-      "mqtt_connection_error": "MQTT连接失败，请检查服务器地址和凭据是否正确"
+      "mqtt_connection_error": "MQTT连接失败，请检查服务器地址和凭据是否正确",
+      "app_source_not_found": "未找到国网 App 集成户号，请先完成新集成登录。"
     },
     "abort": {
       "already_configured": "该电力户号已经配置，请勿重复添加"

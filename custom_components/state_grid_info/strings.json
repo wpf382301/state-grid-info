@@ -75,12 +75,20 @@
           "month_prices": "月份价格（逗号分隔的36个价格）",
           "average_price": "平均单价"
         }
+      },
+      "app_consumer": {
+        "title": "选择国网 App 户号",
+        "description": "请先安装并登录 stevenjoezhang/hass-state-grid，再选择要保存历史的户号。",
+        "data": {
+          "consumer_number": "电力户号"
+        }
       }
     },
     "error": {
       "hassbox_config_not_found": "未找到HassBox配置文件",
       "hassbox_config_error": "读取HassBox配置文件出错",
-      "mqtt_connection_error": "MQTT连接失败"
+      "mqtt_connection_error": "MQTT连接失败",
+      "app_source_not_found": "未找到国网 App 集成户号，请先完成新集成登录。"
     },
     "abort": {
       "already_configured": "该户号已经配置"
@@ -191,12 +199,20 @@
           "month_12_ladder_2_valley": "12月第二阶梯谷电价",
           "month_12_ladder_3_valley": "12月第三阶梯谷电价"
         }
+      },
+      "app_consumer": {
+        "title": "选择国网 App 户号",
+        "description": "请先安装并登录 stevenjoezhang/hass-state-grid，再选择要保存历史的户号。",
+        "data": {
+          "consumer_number": "电力户号"
+        }
       }
     },
     "error": {
       "hassbox_config_not_found": "未找到HassBox配置文件",
       "hassbox_config_error": "读取HassBox配置文件出错",
-      "mqtt_connection_error": "MQTT连接失败"
+      "mqtt_connection_error": "MQTT连接失败",
+      "app_source_not_found": "未找到国网 App 集成户号，请先完成新集成登录。"
     },
     "progress": {
       "import": "正在导入..."

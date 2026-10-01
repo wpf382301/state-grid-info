@@ -116,12 +116,20 @@
           "month_12_ladder_3_valley": "December Third Ladder Valley Price (CNY/kWh)",
           "is_prepaid": "Is Prepaid"
         }
+      },
+      "app_consumer": {
+        "title": "Select App account",
+        "description": "Install and sign in to stevenjoezhang/hass-state-grid first.",
+        "data": {
+          "consumer_number": "Electricity account"
+        }
       }
     },
     "error": {
       "hassbox_config_not_found": "HassBox configuration file not found. Please ensure HassBox integration is installed and configured",
       "hassbox_config_error": "Error reading HassBox configuration file. Please check if the file format is correct",
-      "mqtt_connection_error": "MQTT connection failed. Please check server address and credentials"
+      "mqtt_connection_error": "MQTT connection failed. Please check server address and credentials",
+      "app_source_not_found": "No App integration account found."
     },
     "abort": {
       "already_configured": "This consumer number is already configured"

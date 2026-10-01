@@ -20,7 +20,7 @@ from homeassistant.const import CONF_NAME
 
 from .const import (
     DOMAIN,
-    DATA_SOURCE_HASSBOX, DATA_SOURCE_QINGLONG,
+    DATA_SOURCE_HASSBOX, DATA_SOURCE_QINGLONG, DATA_SOURCE_APP,
     BILLING_STANDARD_YEAR_阶梯, BILLING_STANDARD_YEAR_阶梯_峰平谷,
     BILLING_STANDARD_MONTH_阶梯, BILLING_STANDARD_MONTH_阶梯_峰平谷,
     BILLING_STANDARD_MONTH_阶梯_峰平谷_变动价格, BILLING_STANDARD_OTHER_平均单价,
@@ -35,6 +35,10 @@ from .const import (
     CONF_UPDATE_INTERVAL_MINUTES, DEFAULT_UPDATE_INTERVAL_MINUTES,
 )
 from .storage import StateGridStorage
+from .app_store import AppHistoryStore
+from .app_source import app_entities, read_app_snapshot
+from .app_adapter import merge_app_history
+from homeassistant.const import EVENT_STATE_CHANGED
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +52,8 @@ async def async_setup_entry(
     coordinator = StateGridInfoDataCoordinator(hass, config, entry)
     await coordinator.async_load_storage()
     await coordinator.async_config_entry_first_refresh()
+    if config.get(CONF_DATA_SOURCE) == DATA_SOURCE_APP:
+        coordinator.listen_for_app_updates()
     
     # 创建传感器实体，确保实体ID包含用户的电力户号
     sensor = StateGridInfoSensor(coordinator, config)
@@ -90,7 +96,9 @@ class StateGridInfoDataCoordinator(DataUpdateCoordinator):
         
         # 初始化持久化存储
         consumer_number = config.get(CONF_CONSUMER_NUMBER, "default")
-        self._storage = StateGridStorage(hass, consumer_number)
+        self._storage = (AppHistoryStore if config.get(CONF_DATA_SOURCE) == DATA_SOURCE_APP else StateGridStorage)(hass, consumer_number)
+        self._remove_app_listener = None
+        self._app_refresh_handle = None
         self.data = None
         
         self._setup_data_source()
@@ -100,6 +108,21 @@ class StateGridInfoDataCoordinator(DataUpdateCoordinator):
         await self._storage.async_load()
         if self._storage.data.get("dayList"):
             self.data = deepcopy(self._storage.data)
+
+    def listen_for_app_updates(self):
+        @callback
+        def changed(event):
+            # Registry lookup also picks up entities created later during startup.
+            ids = app_entities(self.hass, self.config[CONF_CONSUMER_NUMBER]).values()
+            if event.data.get('entity_id') not in ids:
+                return
+            if self._app_refresh_handle is not None:
+                self._app_refresh_handle.cancel()
+            def refresh():
+                self._app_refresh_handle = None
+                self.hass.async_create_task(self.async_request_refresh())
+            self._app_refresh_handle = self.hass.loop.call_later(1, refresh)
+        self._remove_app_listener = self.hass.bus.async_listen(EVENT_STATE_CHANGED, changed)
 
     def _setup_data_source(self):
         """Set up the data source based on configuration."""
@@ -228,6 +251,12 @@ class StateGridInfoDataCoordinator(DataUpdateCoordinator):
     async def async_unload(self):
         """Clean up resources when unloading."""
         _LOGGER.info("正在清理State Grid Info资源")
+        if self._remove_app_listener is not None:
+            self._remove_app_listener()
+            self._remove_app_listener = None
+        if self._app_refresh_handle is not None:
+            self._app_refresh_handle.cancel()
+            self._app_refresh_handle = None
         if self.mqtt_client:
             try:
                 self.mqtt_client.loop_stop()
@@ -244,6 +273,20 @@ class StateGridInfoDataCoordinator(DataUpdateCoordinator):
             
             # 记录日志
             _LOGGER.debug("执行数据更新，距离上次更新已过 %s 分钟", time_diff.total_seconds() / 60)
+
+            if self.config.get(CONF_DATA_SOURCE) == DATA_SOURCE_APP:
+                snapshot = read_app_snapshot(self.hass, self.config[CONF_CONSUMER_NUMBER])
+                if snapshot is None:
+                    retained = self._storage.data
+                    if retained:
+                        retained['source_available'] = False
+                    return retained
+                snapshot['consumer_name'] = self.config.get(CONF_CONSUMER_NAME, '')
+                merged = await self.hass.async_add_executor_job(
+                    merge_app_history, self._storage.data, snapshot, self.config
+                )
+                self.last_update_time = current_time
+                return await self._storage.async_save(merged)
             
             if self.config.get(CONF_DATA_SOURCE) == DATA_SOURCE_HASSBOX:
                 # 每次都重新从文件读取最新数据
@@ -1412,12 +1455,12 @@ class StateGridInfoSensor(
                 
                 if recent_days:
                     # 计算日均消费
-                    daily_costs = [day.get("dayEleCost", 0) for day in recent_days]
-                    avg_daily_cost = sum(daily_costs) / len(daily_costs)
+                    daily_costs = [day.get("dayEleCost") for day in recent_days]
+                    avg_daily_cost = sum(daily_costs) / len(daily_costs) if all(v is not None for v in daily_costs) else 0
                     
                     # 计算剩余天数
                     balance = self.coordinator.data.get("balance", 0)
-                    if avg_daily_cost > 0:
+                    if avg_daily_cost > 0 and balance is not None:
                         estimated_days = balance / avg_daily_cost
                         
                         # 计算最新用电日期与今天的差值
@@ -1447,6 +1490,11 @@ class StateGridInfoSensor(
                 "monthlist": self.coordinator.data.get("monthList", []),
                 "yearlist": self.coordinator.data.get("yearList", []),
             })
+            if self.config.get(CONF_DATA_SOURCE) == DATA_SOURCE_APP:
+                attrs.update({key:self.coordinator.data.get(key) for key in (
+                    'data_source','source_updated_at','source_available','data_until','account_type','balance_date','amount_due'
+                )})
+                attrs['data_source'] = DATA_SOURCE_APP
         
         # 添加计费标准配置
         billing_standard_attrs = {}
@@ -1637,6 +1685,10 @@ class StateGridInfoSensor(
                     if data["day"] >= year_ladder_start_date and data["day"] <= current_day:
                         year_accumulated += data["dayEleNum"]
                 
+                if self.config.get(CONF_DATA_SOURCE) == DATA_SOURCE_APP:
+                    year_accumulated = self.coordinator.data.get('ladder_usage')
+                    if year_accumulated is None:
+                        return {}
                 # 确定当前阶梯档
                 if year_accumulated <= ladder_level_1:
                     current_ladder = "第1档"

@@ -24,7 +24,7 @@ class OptimizationContractTests(unittest.TestCase):
 
     def test_manifest_and_translations_are_valid_json(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["version"], "4.3.0")
+        self.assertRegex(manifest["version"], r"^\d+\.\d+\.\d+$")
         for path in [
             COMPONENT / "strings.json",
             COMPONENT / "translations" / "zh-Hans.json",

@@ -6,11 +6,14 @@ NAME = "国家电网辅助信息"
 # 数据来源选项
 DATA_SOURCE_HASSBOX = "hassbox"
 DATA_SOURCE_QINGLONG = "qinglong"
+DATA_SOURCE_APP = "state_grid_app"
 DATA_SOURCE_OPTIONS = [
+    DATA_SOURCE_APP,
     DATA_SOURCE_HASSBOX,
     DATA_SOURCE_QINGLONG,
 ]
 DATA_SOURCE_NAMES = {
+    DATA_SOURCE_APP: "国家电网 App 集成（stevenjoezhang）",
     DATA_SOURCE_HASSBOX: "HassBox集成",
     DATA_SOURCE_QINGLONG: "国网青龙脚本",
 }
