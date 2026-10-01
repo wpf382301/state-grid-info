@@ -2,13 +2,13 @@
   "domain": "state_grid_info",
   "name": "国家电网辅助信息",
   "codeowners": [
-    "xiaoshi930",
-    "wpf382301"
+    "@wpf382301"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/wpf382301/state_grid_info",
+  "documentation": "https://github.com/wpf382301/state-grid-info",
+  "issue_tracker": "https://github.com/wpf382301/state-grid-info/issues",
   "iot_class": "cloud_polling",
-  "version": "4.4.0",
+  "version": "4.4.1",
   "after_dependencies": [
     "mqtt",
     "state_grid"
